@@ -1680,7 +1680,7 @@ bool ConversationStore::write_job(Job& job, const ConversationSource& img, uint6
         s.meta[0] = (int64_t) checks[j].ids.size();
         s.meta[1] = (int64_t) checks[j].imgs.size();
         s.meta[2] = (int64_t) job.check_keys[j];
-        s.meta[3] = (int64_t) img.checkpoints[j].source;
+        s.meta[3] = (int64_t) checks[j].source;   // what took it: the kinds a restart reads back
     }
     for (size_t i = 0; i < img.kv.size(); ++i) {
         const ConversationKvSource& kv = img.kv[i];
