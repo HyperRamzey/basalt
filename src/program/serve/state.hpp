@@ -143,8 +143,9 @@ inline constexpr double kPairFull = 0.70;   ///< the share of windows accepted w
 struct ServeGrowth {
     uint64_t checkpoints = 0;     ///< the running checkpoints (the solo session's and the batch slots')
     uint64_t conversations = 0;   ///< the parked conversations
+    uint64_t checkpoint_bounce = 0;   ///< the page-locked buffer a deferred checkpoint copy goes through
     uint64_t other = 0;           ///< a request's buffers, one image's buffers
-    uint64_t total() const { return checkpoints + conversations + other; }
+    uint64_t total() const { return checkpoints + conversations + checkpoint_bounce + other; }
 };
 ServeGrowth serve_growth(const Options& o, const basalt::core::ModelGeometry& g);
 

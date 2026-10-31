@@ -13,6 +13,7 @@ ServeGrowth serve_growth(const Options& o, const basalt::core::ModelGeometry& g)
         const uint64_t one = z.gdn + z.ple + (uint64_t) g.n_qsa_layers() * (z.tail + z.dead + z.block_pos);
         s.checkpoints = (uint64_t) (o.prompt_cache + 1) * (uint64_t) std::max(o.batch, 1) * one;
         s.conversations = (uint64_t) o.conversation_cache_mib << 20;
+        s.checkpoint_bounce = z.gdn;   // the deferred checkpoint copy's page-locked bounce buffer
     }
     if (!o.vision_mmproj.empty()) {
         // the canvas (8-bit RGB), its normalized planar floats and the patches
