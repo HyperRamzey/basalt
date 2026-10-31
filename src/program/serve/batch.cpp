@@ -50,13 +50,14 @@ bool Runtime::batch_step() {
             if (!ke.empty() && kv_short) {   // the expert cache's floor: this slot's reply ends here
                 BSlot& sl = bs[(size_t) b];
                 basalt::log::warn("basalt batch", "slot %d stopped at %lld cells: %s", b, (long long) at, ke.c_str());
-                std::printf("BDONE %d %lld length %.1f %lld %lld\n", b, (long long) sl.produced,
-                            std::chrono::duration<double, std::milli>(Clock::now() - sl.t0).count(),
-                            (long long) sl.drafts_accepted, (long long) sl.drafts_offered);
                 sl.active = false;
                 sl.cached = o.prompt_cache > 0;   // its sessions hold sl.ids
                 sl.idle_busy = busy_now();
                 sl.guard.reset();
+                report_cache(b, sl.cached, sl.ids, sl.imgs, sl.checks);
+                std::printf("BDONE %d %lld length %.1f %lld %lld\n", b, (long long) sl.produced,
+                            std::chrono::duration<double, std::milli>(Clock::now() - sl.t0).count(),
+                            (long long) sl.drafts_accepted, (long long) sl.drafts_offered);
                 kv_wait[(size_t) b] = 1;
                 continue;
             }
@@ -324,13 +325,14 @@ bool Runtime::batch_step() {
             std::printf("\n");
         }
         if (fin_of[sg] != nullptr) {
-            const double ms = std::chrono::duration<double, std::milli>(Clock::now() - sl.t0).count();
-            std::printf("BDONE %d %lld %s %.1f %lld %lld\n", b, (long long) sl.produced, fin_of[sg], ms,
-                        (long long) sl.drafts_accepted, (long long) sl.drafts_offered);
             sl.active = false;
             sl.cached = o.prompt_cache > 0;   // its sessions hold sl.ids for the next turn
             sl.idle_busy = busy_now();
             sl.guard.reset();
+            report_cache(b, sl.cached, sl.ids, sl.imgs, sl.checks);   // the commit completed: say what the slot holds
+            const double ms = std::chrono::duration<double, std::milli>(Clock::now() - sl.t0).count();
+            std::printf("BDONE %d %lld %s %.1f %lld %lld\n", b, (long long) sl.produced, fin_of[sg], ms,
+                        (long long) sl.drafts_accepted, (long long) sl.drafts_offered);
         } else {
             sl.x = outb[r0s[sg] + k - 1];
             sl.p += k;

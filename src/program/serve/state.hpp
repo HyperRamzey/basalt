@@ -531,6 +531,10 @@ private:
                            size_t& bytes, double& ms);
     bool park_current(size_t held, int64_t kept);
     std::vector<ImgKey> imgs_below(const std::vector<ImgKey>& all, int64_t L);
+    // SCACHE <slot> <tokens it holds> [checkpoint lengths]: what the engine confirms an idle slot holds, printed
+    // before the slot's terminal line so a retry or an edited tail routes through a checkpoint the server knows.
+    void report_cache(int slot, bool cached, const std::vector<int32_t>& held, const std::vector<ImgKey>& images,
+                      const std::vector<ConvCheckpoint>& saved);
     bool gpu_sync_ok();
     bool checkpoint_at(int64_t L, std::vector<ConvCheckpoint>* parts = nullptr, bool defer = false,
                        ConvCheckpoint::Source source = ConvCheckpoint::kPeriodic);

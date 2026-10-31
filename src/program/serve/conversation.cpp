@@ -4,6 +4,40 @@
 
 namespace basalt::program::serve {
 
+// Routing feedback describes only idle state and checkpoints on its retained token/image branch.  The lengths it
+// lists are the checkpoints this slot's held tokens actually start, so the server can restart a conversation from
+// one of them instead of re-reading the whole history.
+void Runtime::report_cache(int slot, bool cached, const std::vector<int32_t>& held, const std::vector<ImgKey>& images,
+                           const std::vector<ConvCheckpoint>& saved) {
+    cached = cached && o.prompt_cache > 0;
+    std::printf("SCACHE %d %zu", slot, cached ? held.size() : size_t(0));
+    // Shared system-prefix checkpoints are reusable, but do not establish conversation affinity.
+    size_t shared = 0;
+    std::string role;
+    if (cached && o.turn_token >= 0 && !held.empty() && held[0] == o.turn_token) {
+        if (text_tokenizer.loaded())
+            for (size_t i = 1; i < held.size() && role.size() < 7; ++i) {
+                const int32_t id = held[i];
+                if (id < 0 || (size_t) id >= text_tokenizer.vocab_size()) break;
+                role += text_tokenizer.token_bytes(id);
+            }
+        // Without role bytes, do not guess whether this is a shared system prefix.
+        if (!text_tokenizer.loaded()) shared = held.size();
+    }
+    if (role.starts_with("system\n")) {
+        shared = held.size();
+        for (size_t i = 1; i < held.size(); ++i)
+            if (held[i] == o.turn_token) { shared = i; break; }
+    }
+    if (cached)
+        for (const ConvCheckpoint& c : saved)
+            if (c.ids.size() > shared && c.ids.size() <= held.size() &&
+                basalt::core::conversation_ids_equal(c.ids.data(), c.ids.size(), held.data()) &&
+                c.imgs == imgs_below(images, (int64_t) c.ids.size()))
+                std::printf(" %zu", c.ids.size());
+    std::printf("\n");
+}
+
 uint64_t fnv1a(const void* data, size_t n, uint64_t h) {
     const uint8_t* p = (const uint8_t*) data;
     for (size_t i = 0; i < n; ++i) { h ^= p[i]; h *= 1099511628211ull; }
