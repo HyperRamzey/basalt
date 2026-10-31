@@ -6,6 +6,7 @@
 #include "basalt/core/layout.hpp"
 #include "basalt/kernels/ngram.hpp"
 #include "basalt/prefill/gemm.hpp"
+#include "basalt/core/diag.hpp"   // --exp fp8_prompt_min / fp8_prompt_kinds
 #include "basalt/core/peer_experts.hpp"
 #include "basalt/log.hpp"
 #include <algorithm>
