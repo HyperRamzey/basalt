@@ -239,6 +239,10 @@ The engine loads the vector; a request controls it with the request field `cvec:
 out uses the server's [`cvec`](#server) option (config `"server": {"cvec": false}`), then the model file's
 `sampling.cvec`, then on when a vector is loaded.
 
+The server's own state switches with `POST /v1/cvec` (`{"cvec": true}` or `false`): it sets the state a request that
+leaves the `cvec` field out gets, from the next request on; `GET /v1/cvec` reads it back, and the monitor shows the
+switch while the engine reports a loaded vector.
+
 `--control-vector-scaled` takes one or more `FILE:SCALE` entries. For each layer the files' scaled
 `direction.<layer>` tensors are summed; `add` adds that sum, `project` normalizes it to `v` and uses the sum's norm as
 `s` in `h -= s (h.v) v`. With a unit direction, `SCALE 1` removes the component and `2` reflects it.
