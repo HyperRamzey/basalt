@@ -19,6 +19,7 @@ struct Context {
     bool* split_want = nullptr;
     const int* split_cap = nullptr;
     std::function<void ()> set_stream_all_min;
+    int64_t* stream_all_priced = nullptr;   // the serve path's one-card stream-all price, once known
     std::vector<int64_t>* split_at = nullptr;
     std::vector<int>* split_devs = nullptr;
     bool* split_auto = nullptr;

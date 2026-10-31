@@ -2,6 +2,7 @@
 #include "layout.hpp"
 #include "basalt/ggml/ggml.h"
 #include "basalt/prefill/prefill.hpp"
+#include "basalt/prefill/stream_all.hpp"
 #include "basalt/core/mtp.hpp"
 #include "basalt/core/layout.hpp"
 #include "basalt/kernels/ngram.hpp"
@@ -30,7 +31,8 @@ namespace basalt::prefill {
 using namespace detail;
 
 namespace detail {
-int64_t g_stream_all_min = 6144;
+// The chunk size from which every expert streams: below it only the routed experts are staged (stream_all.hpp).
+int64_t g_stream_all_min = kStreamAllDefault;
 bool g_fp8 = false;
 int g_ring_depth = kPrefillRingDeep;
 double g_pinned_share = 1.0;

@@ -87,7 +87,7 @@ public:
     static void set_pinned_share(double share);
 
     /// The chunk size from which every expert streams (below it only the routed experts are staged and the peer card
-    /// computes the rows of its own); before init, which sizes the buffers by it.  Default 1024.
+    /// computes the rows of its own); before init, which sizes the buffers by it.
     static void set_stream_all_min(int64_t tokens);
 
     /// The dense projections of chunks of 1024 tokens or more on the FP8 tensor cores (Gemm::native8), for the prompt
