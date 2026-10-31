@@ -35,7 +35,7 @@ and the draft layer's K/V alike), and the rest of that VRAM holds the expert cac
 it. A request backs its prompt plus 16384 cells before the prompt is read (and 16384 more whenever decode runs past
 that) by taking those slots back; their experts become CPU misses - read from RAM homes the request's admission takes
 and the cache gives back when it grows again, or from the RAM copies the start keeps for them when `--batch` has more
-than one slot ([elastic KV](elastic-kv.md)). The next request that
+than one slot ([elastic KV](elastic-kv.md)). A single-stream request deeper than the VRAM tail keeps its K/V in pinned RAM instead when the RAM holds it (the host K/V, read through a pool of VRAM slots; `--exp kv_host=0` turns it off). The next request that
 needs less gives the cells back and the cache refills the slots from RAM, so a short request decodes with the cache a
 32k context would have. With `--parallel` a slot whose share is above 4096 tokens backs 4096 cells at startup and grows
 by 4096. An idle conversation's KV stays until requests beside it have run 15 s, then moves to RAM (outside

@@ -65,6 +65,8 @@ struct Context {
     std::function<int(int64_t)> stage_of;
     std::vector<std::pair<int32_t, int32_t>>* profile_all = nullptr;
     const int64_t* kv_floor = nullptr;
+    const bool* kv_host_on = nullptr;         // the per-request host K/V is available on this run
+    const bool* kv_host_forced = nullptr;     // --exp kv_host=1 asked for it, so its refusals are said
     std::vector<std::vector<SlotSession>>* bslot_ss = nullptr;
     std::vector<int64_t>* slot_cap = nullptr;
     uint64_t* slot_kv_cuda0 = nullptr;

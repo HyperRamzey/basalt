@@ -33,6 +33,10 @@ public:
     /// starts on a grid line or where an earlier `map` stopped; `unmap` gives back every mapping that starts at or above
     /// its cut, however few calls backed it.
     void set_extent_cells(int64_t cells) { extent_cells_ = std::max<int64_t>(cells, 0); }
+    /// Array `i` backs at most its first `pages` pages whatever `map` asks for (a streamed state's slot pool, while
+    /// the rows that follow the depth keep growing); `pages <= 0` lifts the cap.  A lower cap gives its excess back
+    /// at the next `unmap`.  `cells()` counts a capped array as covering every cell once its cap is backed.
+    void cap(size_t i, int64_t pages);
     void close();
     bool valid() const { return !arrays_.empty(); }
 
@@ -62,6 +66,7 @@ private:
         uint64_t page_bytes = 0;
         uint64_t tail_bytes = 0;
         uint64_t reserved = 0;
+        int64_t cap_pages = 0;          // > 0: backs at most this many pages
         std::vector<uint8_t> contents;
         std::vector<Extent> extents;   // back to back from offset 0
         uint64_t mapped() const { return extents.empty() ? 0 : extents.back().off + extents.back().bytes; }
