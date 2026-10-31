@@ -30,6 +30,12 @@ constexpr int RING_MAX = 384;           // the arrays; the ring itself is ring_s
 // non-resident expert costs the same whatever the chunk, so it pays only once most of them are routed anyway.
 extern int64_t g_stream_all_min;
 inline int64_t stream_all_min() { return g_stream_all_min; }
+// --prefill-fp8: the dense projections of chunks of kFp8MinTokens tokens or more in FP8 (shorter chunks gain little
+// against the conversions).  kFp8Kinds says which: all but the two that write the residual stream (GDN out, QSA o),
+// whose error costs the most quality per millisecond saved
+extern bool g_fp8;
+constexpr int64_t kFp8MinTokens = 1024;
+constexpr int kFp8Kinds = 1 | 2 | 8 | 16 | 64;   // 1 GDN qkv, 2 GDN z, 4 GDN out, 8 QSA q, 16 QSA k/v, 32 QSA o, 64 shared expert
 // The streamed ring's slots (one whole expert blob each, the same for every pack).  g_ring_depth caps the depth the
 // next layout is laid out with (a prompt read beside decoding slots lends fewer cache slots with a shallower ring).
 constexpr int kPrefillRing = 256;
@@ -52,8 +58,10 @@ inline double ms_since(Clock::time_point t) { return std::chrono::duration<doubl
 void up_mix(Gemm& gm, const uint16_t* w_up, const uint16_t* lo16, float* gated, const float* R, const float* rs,
             const float* w_norm, float* mixed, uint16_t* mixed16, uint16_t* mixed_h, int64_t T, void* stream);
 const core::WeightRef* need(const core::LayerView& v, const char* suffix, std::string& err);
+// `x8`: X's E4M3 rows (Gemm::act8), for the product on the FP8 tensor cores; without them, or when that product
+// cannot run, the FP16 product.
 bool native_proj(Gemm& gm, const core::WeightRef* w, const uint16_t* X, float* Y, int64_t T, const std::string& name,
-                 std::string& err, int64_t ldy = 0);
+                 std::string& err, int64_t ldy = 0, const Gemm::Rows8* x8 = nullptr);
 bool bf16_proj(Gemm& gm, const core::WeightRef* w, const uint16_t* X, float* Y, int64_t T, const std::string& name,
                std::string& err, int64_t ld = 0);
 extern double g_pinned_share;

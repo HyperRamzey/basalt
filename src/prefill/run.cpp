@@ -64,6 +64,9 @@ bool Prefill::Run::Chunk::execute() {
     if (!inputs()) return false;
     if (!start_stream()) return false;
     m.ahead_layer[0] = m.ahead_layer[1] = m.guess_layer = -1;
+    f8 = m.fp8_min > 0 && T >= m.fp8_min && m.gemm.fp8_ready();
+    cap_bo = (size_t) m.T * N * 4;
+    cap_zv = (size_t) m.T * ZV * 4;
     for (int64_t l = LB; l < LE; ++l) {
         if (!layer(l)) return false;
     }

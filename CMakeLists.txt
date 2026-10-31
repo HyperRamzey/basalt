@@ -449,7 +449,8 @@ endif()
 # `basalt` (generate.cpp): the engine program that composes the components into a token.  The prompt arrives as
 # ids, so a tokenizer is never on one side of a logit comparison.
 # The prompt path: batched prompt processing (tensor-core GEMMs through cuBLAS).
-add_library(prefill STATIC src/prefill/gemm.cu src/prefill/gemm_plans.cpp src/prefill/kernels.cu src/prefill/gdn_chunked.cu
+<<<<<<< HEAD
+add_library(prefill STATIC src/prefill/gemm.cu src/prefill/gemm_plans.cpp src/prefill/gemm_fp8.cu src/prefill/kernels.cu src/prefill/gdn_chunked.cu
   src/prefill/lifecycle.cpp
   src/prefill/layout.cpp
   src/prefill/projection.cpp
@@ -477,6 +478,12 @@ add_library(prefill STATIC src/prefill/gemm.cu src/prefill/gemm_plans.cpp src/pr
   src/prefill/expert_stream.cpp
   src/prefill/combine.cpp
   src/prefill/handoff.cpp)
+||||||| 6025cbcf
+add_library(prefill STATIC src/prefill/gemm.cu src/prefill/kernels.cu src/prefill/gdn_chunked.cu src/prefill/prefill.cpp)
+=======
+add_library(prefill STATIC src/prefill/gemm.cu src/prefill/gemm_fp8.cu src/prefill/kernels.cu src/prefill/gdn_chunked.cu
+            src/prefill/prefill.cpp)
+>>>>>>> refs/pr/129
 target_include_directories(prefill PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include ${_gpu_include_directories})
 target_link_libraries(prefill PUBLIC engine ${_gpu_blas_target} ${_gpu_runtime_target})
 
@@ -1340,6 +1347,12 @@ if(BUILD_TESTING)
   target_link_libraries(prefill_mmq_kq_test PRIVATE prefill mmq kernels ${_gpu_runtime_target})
   basalt_gpu_test(NAME prefill_mmq_kq_test COMMAND prefill_mmq_kq_test)
   set_tests_properties(prefill_mmq_kq_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 600)
+  # the dense projections on the FP8 tensor cores against the FP16 dequant + cuBLAS path and a double-precision
+  # reference (--bench [T]: timings)
+  add_executable(prefill_fp8_dense_test tests/cuda/prefill_fp8_dense_test.cpp)
+  target_link_libraries(prefill_fp8_dense_test PRIVATE prefill mmq kernels ggml_quants ${_gpu_runtime_target})
+  basalt_gpu_test(NAME prefill_fp8_dense_test COMMAND prefill_fp8_dense_test)
+  set_tests_properties(prefill_fp8_dense_test PROPERTIES SKIP_RETURN_CODE 77 TIMEOUT 600)
 endif()
 if(BUILD_TESTING)
   # the FP16 / BF16 prompt products: a row's products the same bits at every call width, against cublasGemmEx and a
