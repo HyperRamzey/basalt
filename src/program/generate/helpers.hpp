@@ -9,6 +9,14 @@ using basalt::program::serve::serve_growth_bytes;
 using basalt::program::engine_local::kSatBoost;
 
 
+// A swap takes a free place in the RAM copy only for an evicted expert that has no RAM copy there: the cache's slots
+// below the prompt path's lend region keep none, so the places the start reserves follow their share of the cache
+// (see FileExpertSource::set_spares).
+inline int64_t spare_places_of(int64_t full, int64_t lend_from, int64_t n_slots) {
+    if (lend_from < 0 || n_slots <= 0) return full;
+    return (full * lend_from + n_slots - 1) / n_slots;
+}
+
 using Clock = std::chrono::steady_clock;
 
 using basalt::program::Options;

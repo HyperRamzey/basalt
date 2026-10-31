@@ -132,6 +132,8 @@ struct Context {
     const uint64_t* late = nullptr;
     const uint64_t* resident_headroom_base = nullptr;
     int64_t* lend_from = nullptr;
+    const bool* kv_tail_copies = nullptr;   // the elastic KV's tail keeps RAM copies of its experts (--batch slots)
+    int64_t* copies_from = nullptr;         // the first slot whose expert the RAM copy really keeps
     std::vector<std::pair<int32_t, int32_t>>* stage_held = nullptr;
     basalt::kernels::cpu::ExpertPool* pool = nullptr;
     std::vector<std::pair<int32_t, int32_t>>* peer_only = nullptr;
