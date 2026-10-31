@@ -1,4 +1,5 @@
 #include "common.hpp"
+#include "basalt/kernels/cpu/expert_layout.hpp"   // the warm-up reads each layer's blob sizes
 #include "expert_plan.hpp"
 #include "diagnostics.hpp"
 #include "basalt/core/load_progress.hpp"
