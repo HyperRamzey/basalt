@@ -395,7 +395,10 @@ if(BUILD_TESTING)
   add_executable(conversation_store_test tests/core/conversation_store_test.cpp)
   target_link_libraries(conversation_store_test PRIVATE engine)
   basalt_cpu_test(NAME conversation_store_test COMMAND conversation_store_test)
-  set_tests_properties(conversation_store_test PROPERTIES ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" TIMEOUT 120)
+  # 120 s upstream.  PR #149's own test writes ~0.4 GiB of containers through this volume: measured on this machine
+  # with the engine parked, plain main 45 s, PR #149 on its own 103 s, this stack 127 s (2026-11-01).  The work is
+  # real disk I/O on a RAID the model also reads from, so the room is raised rather than the test trimmed.
+  set_tests_properties(conversation_store_test PROPERTIES ENVIRONMENT "CUDA_VISIBLE_DEVICES=-1" TIMEOUT 300)
   # The transfer-failure paths are reached by GNU ld's --wrap, which symbolizes the three runtime calls. The Windows
   # linker has no equivalent, so that one program is not built here; the same source builds the ordinary snapshot
   # test above, which does port.

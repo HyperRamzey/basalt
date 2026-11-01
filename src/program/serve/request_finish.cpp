@@ -192,15 +192,15 @@ Flow Request::complete() {
     const int report_slot = slot_b >= 0 ? slot_b : 0;
     if (yielded_at >= 0 && !ram_out) {
         const BSlot& sl = runtime_.bs[(size_t) yielded_slot];
-        report_cache(yielded_slot, sl.cached, sl.ids, sl.imgs, sl.checks);
+        runtime_.report_cache(yielded_slot, sl.cached, sl.ids, sl.imgs, sl.checks);
     }
     if (yielded_slot != report_slot || ram_out) {
         if (slot_b > 0 || (admitted_slot >= 0 && admission_status != 0) ||
             (runtime_.slot0_is_solo && !runtime_.bs.empty() && runtime_.bs[0].cached)) {
             const BSlot& sl = runtime_.bs[(size_t) report_slot];
-            report_cache(report_slot, !ram_out && sl.cached && !sl.active, sl.ids, sl.imgs, sl.checks);
+            runtime_.report_cache(report_slot, !ram_out && sl.cached && !sl.active, sl.ids, sl.imgs, sl.checks);
         } else {
-            report_cache(report_slot, !ram_out && runtime_.live_ok, runtime_.live, runtime_.live_imgs, runtime_.checks);
+            runtime_.report_cache(report_slot, !ram_out && runtime_.live_ok, runtime_.live, runtime_.live_imgs, runtime_.checks);
         }
     }
     if (ram_out) {

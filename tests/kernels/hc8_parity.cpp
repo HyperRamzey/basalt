@@ -263,7 +263,11 @@ int main(int argc, char** argv) {
         Err es;   // row slices: cuBLAS may pick another kernel for the narrower product (another summation order)
         for (int64_t t = 0; t < s.T; ++t)
             for (int64_t n = 0; n < s.N; ++n) es.add(y2[t * ldy + n], y1[t * ldy + n]);
-        const bool sliced = es.rel() < 1e-5;
+        // 1e-5 upstream.  This build also carries PR #157's pinned per-shape cuBLASLt algorithms, and a row slice
+        // starts at a different alignment than the whole matrix, so the slices take another pinned algorithm: on
+        // CUDA 13.4 / sm_120 the sliced product lands 1.1e-5 from the whole one (2.7e-06 and 5.1e-07 without the
+        // pinning, measured 2026-11-01).  5e-5 keeps the check's real purpose - a wrong slice is off by ~1e-1.
+        const bool sliced = es.rel() < 5e-5;
         std::printf("%s: vs bf16 max abs %.3e (rel %.3e) | vs the copy in double max abs %.3e (rel %.3e) | sliced vs whole "
                     "rel %.1e\n", s.what, eb.abs, eb.rel(), ex.abs, ex.rel(), es.rel());
         expect(ex.rel() < 5e-3, "the product against the copy in double");

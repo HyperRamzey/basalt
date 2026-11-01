@@ -16,6 +16,8 @@ bool Request::starts_with(const std::vector<int32_t>& pre, const std::vector<Img
 void Request::drop_incoming() {
     incoming.reset();
     disk_kv.reset();
+}
+
 // the tail without RAM copies: the loan follows the cache's end down as the KV grows, so the experts it reaches
 // below the slots that keep a copy take a home before the prompt is read
 bool Request::loan_homes() {
