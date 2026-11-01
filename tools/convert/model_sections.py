@@ -15,7 +15,7 @@ import pathlib
 import re
 import struct
 import sys
-from collections import defaultdict, deque
+from collections import deque
 
 import numpy as np
 import os
