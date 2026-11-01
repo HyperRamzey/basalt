@@ -276,6 +276,11 @@ class CompleteSetTest(unittest.TestCase):
     CFG = {"text_config": {**GDN_CFG["text_config"], "indexer_n_heads": 1, "indexer_head_dim": 32,
                            "num_hidden_layers": 2, "layer_types": ["linear_attention", "full_attention"]}}
 
+    # .basalt version 2 computes the `hc8` section from the pack's hyper-connection matrices, so the fixture's
+    # hyper-connection weights have to be matrices (rows x cols, cols a whole group of 32) the way a real checkpoint
+    # stores them; a flat (H,) vector is what hc8 refuses.
+    HC_MATRIX = ("input_mix_weight_down.weight", "input_mix_weight_up.weight", "block_inject_weight.weight")
+
     @staticmethod
     def tensors():
         L = "model.language_model.layers."
@@ -286,12 +291,13 @@ class CompleteSetTest(unittest.TestCase):
                 if part == "linear_attn" and kind != "linear_attention" or part == "self_attn" and kind != "full_attention" \
                         or part == "ple" and l != 1:
                     continue
-                shape = (4, 1, 4) if how in ("conv", "gconv") else (4, 64) if ty in ("MAT", "Q8_0") else (64,)
+                shape = (4, 1, 4) if how in ("conv", "gconv") else (4, 64) if ty in ("MAT", "Q8_0") \
+                    else (4, 64) if key.endswith(CompleteSetTest.HC_MATRIX) else (64,)
                 out[f"{L}{l}.{key}"] = ("BF16", shape, bytes(2 * int(np.prod(shape))))
             if kind == "full_attention":
                 out[f"{L}{l}.{C.INDEXER_QK}"] = ("BF16", (64, 64), bytes(2 * 64 * 64))
         for k, (_, ty, how) in C.GLOBAL.items():
-            shape = (4, 64) if ty == "Q8_0" else (64,)
+            shape = (4, 64) if ty == "Q8_0" or k.endswith(CompleteSetTest.HC_MATRIX) else (64,)
             out[k] = ("BF16", shape, bytes(2 * int(np.prod(shape))))
         return out
 

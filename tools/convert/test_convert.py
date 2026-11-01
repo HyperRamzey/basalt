@@ -224,7 +224,6 @@ class ConvertTest(unittest.TestCase):
                                      (type_name, type_id, [160, 3], 3 * row_bytes))
                     self.assertEqual(pack.read("gguf")[info["offset"]:info["offset"] + info["bytes"]], raw)
 
-    def test_without_hc8_or_drafter(self):
     def test_without_drafter(self):
         convert.convert(self.args())
         m = self.model()
