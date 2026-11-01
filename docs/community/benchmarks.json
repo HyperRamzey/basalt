@@ -712,6 +712,30 @@
       "prefill_64k_tps": 3566.9,
       "decode_tps": 156.6,
       "notes": "2x RTX 5060 Ti 16GB PCIe 4.0 x8/x8, no P2P (2nd card = peer tier), Proxmox LXC; +2500 MHz MEM OC (clocks-only, stock voltage); 0 SSD spill; engine fork c15bbd27d5 (upstream 5d28eff + BF16-PLE)"
+    },
+    {
+      "submitter": "sanjxz",
+      "date": "2026-11-01",
+      "commit": "c7bf051c35",
+      "preset": "community-1",
+      "gpus": [
+        {
+          "name": "RTX 5070",
+          "vram_gib": 12,
+          "power_w": 250,
+          "pcie": "4.0 x16",
+          "h2d_gbps": 28.2
+        }
+      ],
+      "ram_gib": 55,
+      "cpu": "AMD Ryzen 7 5700X3D, 8 cores",
+      "ram_gbps": 42.7,
+      "os": "Linux",
+      "quant": "IQ3_XXS",
+      "prefill_16k_tps": 3119.5,
+      "prefill_64k_tps": 3102.6,
+      "decode_tps": 84.7,
+      "notes": "12 GiB card: 9.1 GiB of the pack in VRAM, 34.7 GiB in RAM, nothing read from the SSD. Fork build with upstream PRs merged by hand: HyperRamzey/basalt tag stack-5070-20261101"
     }
   ]
 }
