@@ -1,0 +1,341 @@
+# Maintainer: sanjxz (local build, mirrors packaging/PKGBUILD.strata-engine-git)
+pkgname=basalt-engine-git
+pkgver=0.1.0.r2271.gc7bf051c
+pkgrel=1
+pkgdesc='Run Qwen3.8-Flash-Next (125B MoE) on one NVIDIA Blackwell GPU plus system RAM, with a local OpenAI/Anthropic-compatible API (git version)'
+arch=('x86_64')
+url='https://github.com/jesdga95/basalt'
+# Basalt and the ggml code it extracts are MIT. The model packs you download carry their own
+# licence (the Qwen packs are under the Qwen Community License 1.0).
+license=('MIT')
+depends=(
+  'cuda>=13'            # libcudart and libcublas 13 (the engine is built against CUDA 13)
+  'nvidia-utils>=580'   # nvidia-smi and a driver new enough for CUDA 13
+  'gcc-libs'
+  'python'
+  'python-numpy'
+  'python-jinja'
+  'python-regex'
+  'python-yaml'
+  'python-tqdm'
+  'python-pillow'
+  'python-psutil'
+)
+makedepends=('git' 'cmake' 'ninja' 'gcc' 'python')
+optdepends=(
+  'cmake: recompile the engine (Blackwell only) with a different CUDA or compiler'
+  'ninja: same'
+  'gcc: same'
+)
+provides=('basalt-engine')
+conflicts=('basalt-engine')
+options=('!lto' '!debug')
+
+# CMakeLists.txt refuses anything but compute capability 12.0, so there is nothing to widen here.
+_cuda_archs=120
+# Also build basalt-vision, the image-encoder sidecar. Skip it: _build_vision=0 makepkg -si
+: "${_build_vision:=1}"
+# nvcc is memory hungry and this box may be running another engine at the same time: a quarter of the cores.
+: "${_jobs=$(( $(nproc) / 4 ))}"
+
+# Only the upstream tree is a makepkg source.  The stack patch is read straight from this directory
+# ($startdir/patches/) by prepare(): makepkg's local-source lookup does not accept a subdirectory path, and the
+# patch's integrity is not a sha256 of its text anyway - prepare() compares the TREE HASH the patch produces
+# against patches/TREE, which is the thing that has to be right.
+source=("basalt::git+https://github.com/jesdga95/basalt.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  # The stack mode decides what the version means, and the checked-in series says what it is: the series
+  # is a diff of one pinned upstream commit to the stack tip, so the stack tip's version is recorded next
+  # to it instead of being recomputed from a clone that has no merge commits.
+  if [[ -z $_stack && $_no_stack != 1 && -f "$startdir/patches/VERSION" ]]; then
+    cat "$startdir/patches/VERSION"
+    return 0
+  fi
+  cd basalt
+  local _v
+  _v=$(grep -oP 'project\(basalt VERSION \K[0-9.]+' CMakeLists.txt)
+  printf '%s.r%s.g%s' "$_v" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+# The stack this package builds: the open upstream PRs merged onto one pinned upstream commit - the clean ones
+# by `git merge` in the local tree below (`packaging/src/basalt`, branch `makepkg`) and the ones that main's file
+# splits broke resolved by hand, every hand merge its own commit saying where the hunks went.  What makepkg
+# consumes is the checked-in result of that work: `patches/basalt-stack.patch`, the diff from the pinned commit to
+# the stack tip, so a clean clone of upstream plus this PKGBUILD reproduces the installed stack exactly.
+#
+#   merged clean:    179 174 167 166 67 127 177 176 175 178 112 170 150 156 181 182 183
+#   hand-resolved:   114 115 117 128 129 149 155 157 159 100 101 107 66 89 75
+#   not taken:       13 87 (expert formats / pack types this pack does not carry), 68 96 (serve
+#                    image-source policy and pricing this setup does not use), 70 126 184 (draft
+#                    PRs; 126 only moves the elastic KV this config disables with --kv-resident),
+#                    80 90 (benchmark tables for other GPUs), 110 (Windows host memory); 98 is
+#                    already in upstream main.  Each reason: ../README-setup.md.
+#
+# Default (nothing set): patches/basalt-stack.patch applied to the pinned upstream commit in patches/BASE.  That is
+# reproducible from a clean clone of the upstream repo alone, and the tree it produces is compared against
+# patches/TREE, so the package cannot silently build something other than the stack that was measured here.
+#   Regenerate it after re-resolving the stack in the local tree:
+#     packaging/refresh-stack.sh
+# Overrides are the variables themselves, set on makepkg's command line (the same way _jobs and
+# _build_vision work - makepkg passes the caller's environment through, and `: "${var:=default}"` only fills
+# in what is unset):
+#   development shortcut, the local tree's branch with its merge commits:
+#     _stack=/mnt/aosp/Projects/basalt/packaging/src/basalt makepkg -si
+#   plain upstream main:
+#     _no_stack=1 makepkg -si
+#   upstream main + only the listed clean PRs:
+#     _no_stack=1 _prs="179 174 167 166 67 127 177 176 175 178" makepkg -si
+: "${_stack:=}"
+: "${_stack_ref:=makepkg}"
+: "${_prs:=}"
+# 1 = build plain upstream (or the _prs list) instead of the checked-in stack patch
+: "${_no_stack:=0}"
+# Which directory under $srcdir the build runs in.  prepare() sets it; the stack patch mode uses its own worktree
+# ($srcdir/stack) so that the clone in $srcdir/basalt - which on this box is the development tree that
+# ../basalt_build.sh builds and resolves merges in - is never reset, cleaned, or left detached by a package build.
+# A `makepkg --noextract` run skips prepare(), and then this falls back to $srcdir/basalt: the tree already there.
+: "${_src_dir:=}"
+
+# Where the built tree is: prepare() records it in $srcdir/.basalt-src, because makepkg does not carry a variable
+# set in prepare() into build() or package().  An explicit _src_dir wins (the build wrapper passes one when it
+# runs makepkg with --noextract, where prepare() never ran); the recorded file is next; the plain clone is the
+# fallback.
+_basalt_src_dir() {
+  if [[ -n $_src_dir ]]; then printf '%s' "$_src_dir"; return 0; fi
+  if [[ -f "$srcdir/.basalt-src" ]]; then printf '%s' "$(cat "$srcdir/.basalt-src")"; return 0; fi
+  printf 'basalt'
+}
+
+prepare() {
+  cd basalt
+  _src_dir=basalt
+  if [[ -z $_stack && $_no_stack != 1 ]]; then
+    # The reproducible path: pinned upstream commit + the checked-in diff of the whole stack, assembled in a
+    # worktree of its own so the clone beside it keeps its own checkout.
+    local base want got work="$srcdir/stack"
+    base=$(cat "$startdir/patches/BASE")
+    want=$(cat "$startdir/patches/TREE")
+    if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+      echo "==> base commit $base is not in the clone - fetch upstream or re-pin patches/BASE"; return 1
+    fi
+    git worktree prune
+    if [ -e "$work" ]; then
+      git worktree remove --force "$work" 2>/dev/null || rm -rf "$work"
+    fi
+    if ! git worktree add --detach -q "$work" "$base"; then
+      echo "==> could not open a worktree at $base - re-resolve the stack"; return 1
+    fi
+    if ! ( cd "$work" && git apply --index "$startdir/patches/basalt-stack.patch" && git add -A ); then
+      ( cd "$work" && git reset --hard -q HEAD && git clean -xdqf ) 2>/dev/null
+      echo "==> patches/basalt-stack.patch does not apply onto $base - re-resolve the stack"; return 1
+    fi
+    got=$( cd "$work" && git write-tree )
+    if [[ $got != "$want" ]]; then
+      echo "==> stack tree mismatch: the patch produced $got, the recorded stack is $want"; return 1
+    fi
+    _src_dir=stack
+    echo stack > "$srcdir/.basalt-src"
+    echo "==> stack worktree $srcdir/stack: $(cut -c1-8 "$startdir/patches/BASE") + patch = tree $got (= $(cat "$startdir/patches/VERSION"))"
+    return 0
+  fi
+  echo basalt > "$srcdir/.basalt-src"
+  if [[ -n $_stack ]]; then
+    # The local tree carries the merge commits, including the hand-resolved ones, which no
+    # refs/pull/N fetch can reproduce.  Fetching its branch keeps this clone's own history.
+    if ! git fetch --force "$_stack" "refs/heads/$_stack_ref:refs/pkg/stack"; then
+      echo "==> stack fetch failed: $_stack refs/heads/$_stack_ref"; return 1
+    fi
+    if ! git merge --no-edit --no-ff -q refs/pkg/stack -m "pkgbuild: the local $_stack_ref stack"; then
+      git merge --abort 2>/dev/null
+      echo "==> the $_stack_ref stack does not merge onto $(git rev-parse --short HEAD) - re-resolve it in $_stack"
+      return 1
+    fi
+    echo "==> stack $_stack_ref -> $(git rev-parse --short HEAD)"
+    return 0
+  fi
+  [[ -z $_prs ]] && return 0
+  for _n in $_prs; do
+    # Fetched from GitHub by URL: makepkg clones the tree from its own mirror, which carries
+    # refs/heads/*, not refs/pull/*.
+    if ! git fetch --force https://github.com/jesdga95/basalt "refs/pull/$_n/head:refs/pr/$_n"; then
+      echo "==> PR #$_n: fetch failed"; return 1
+    fi
+    if ! git merge --no-edit --no-ff -q "refs/pr/$_n" -m "pkgbuild: upstream PR #$_n"; then
+      git merge --abort 2>/dev/null
+      echo "==> PR #$_n does not merge onto $(git rev-parse --short HEAD) - drop it from _prs"
+      return 1
+    fi
+    echo "==> merged PR #$_n -> $(git rev-parse --short HEAD)"
+  done
+}
+
+build() {
+  export PATH="/opt/cuda/bin:$PATH"
+  # Basalt's ggml-derived code adds its own per-file AVX2/AVX-512 flags; Arch's -march=x86-64 and
+  # -Werror=format-security would fight with that.
+  unset CFLAGS CXXFLAGS CPPFLAGS LDFLAGS
+
+  # Name the compiler: CMake's default search lands on clang++ here, and clang with libstdc++ 16
+  # cannot compile src/program/grammar/json_value.hpp (a vector of pair<string, JsonValue> declared
+  # inside JsonValue: the pair's constructor constraints need the complete type). GCC compiles it.
+  # If a future CUDA rejects this host compiler, point CMake at another one:
+  #   CUDAHOSTCXX=/usr/bin/g++-15 makepkg -si
+  # nvcc keeps its own host compiler (gcc from PATH); CUDAHOSTCXX overrides it if a CUDA release
+  # ever rejects this one.
+  local _targets=(basalt basalt-bench basalt-probe)
+  [[ $_build_vision == 1 ]] && _targets+=(basalt-vision)
+
+  _src_dir=$(_basalt_src_dir)
+  cmake -S "$_src_dir" -B build -G Ninja -Wno-dev \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER=/usr/bin/gcc \
+    -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
+    -DCMAKE_CUDA_COMPILER=/opt/cuda/bin/nvcc \
+    -DCMAKE_CUDA_ARCHITECTURES="$_cuda_archs" \
+    -DBUILD_TESTING=OFF
+  cmake --build build --target "${_targets[@]}" -j "$_jobs"
+}
+
+package() {
+  local _share="$pkgdir/usr/share/basalt"
+  local _engine="$pkgdir/usr/lib/basalt/engine"
+  install -d "$_share" "$_engine" "$pkgdir/usr/bin"
+
+  # --- the read-only application tree -------------------------------------------------------------
+  # serve/ is the Python server (the engine's own `basalt serve` subcommand execs `python -m
+  # serve.server` from its build tree, which does not exist after installation, so the launcher
+  # runs that module itself and passes --engine-bin). tools/ carries the .basalt reader/writer and
+  # the converter, data/bench the bench fixtures, include/ src/ cmake/ the engine sources so the
+  # tree can be recompiled.
+  _src_dir=$(_basalt_src_dir)
+  cd "$srcdir/$_src_dir"
+  cp -r serve tools data include src cmake tests "$_share/"
+  install -Dm644 -t "$_share" CMakeLists.txt requirements.txt requirements-test.txt \
+    README.md CONTRIBUTING.md AGENTS.md THIRD_PARTY_LICENSES
+
+  # --- the compiled engine ------------------------------------------------------------------------
+  # bin/ is where the CMakeLists puts the four user programs (RUNTIME_OUTPUT_DIRECTORY).
+  install -Dm755 -t "$_engine" "$srcdir/$_src_dir/bin/basalt"
+  install -Dm755 -t "$_engine" "$srcdir/$_src_dir/bin/basalt-bench"
+  install -Dm755 -t "$_engine" "$srcdir/$_src_dir/bin/basalt-probe"
+  if [[ $_build_vision == 1 ]]; then
+    install -Dm755 -t "$_engine" "$srcdir/$_src_dir/bin/basalt-vision"
+  fi
+  echo "$pkgver-$pkgrel" > "$_share/PKG_VERSION"
+
+  # --- docs ---------------------------------------------------------------------------------------
+  install -d "$pkgdir/usr/share/doc/$pkgname"
+  cp -r docs/. "$pkgdir/usr/share/doc/$pkgname/"
+
+  # --- launcher -----------------------------------------------------------------------------------
+  # Files live in ${BASALT_HOME:-~/.local/share/basalt}: app/ is a per-user tree of symlinks into
+  # /usr/share/basalt plus the engine binaries (the server writes its logs and caches next to its
+  # working directory), models/ holds the .basalt packs, basalt_config.json the settings.
+  cat > "$pkgdir/usr/bin/basalt" <<'EOF'
+#!/bin/bash
+# Launcher for the basalt-engine-git package.
+#   basalt                      start the server with basalt_config.json
+#   basalt serve [args]         same, with extra server options (--port 9000) or engine flags (--kv q4_0)
+#   basalt engine [flags]       the engine binary on its own (basalt engine --help lists its flags)
+#   basalt bench --model FILE   the fixed benchmark      (tuning tools; not run by this package)
+#   basalt probe --model FILE   measure the machine and suggest settings
+#   basalt vision [args]        the image-encoder sidecar
+#   basalt config               where everything lives, and the current config
+#
+# ${BASALT_HOME:-~/.local/share/basalt}/app      symlink tree the server runs from (logs, caches)
+# ${BASALT_HOME:-~/.local/share/basalt}/models   .basalt packs
+# ${BASALT_HOME:-~/.local/share/basalt}/basalt_config.json   settings (BASALT_CONFIG overrides the path)
+set -e
+
+share=/usr/share/basalt
+lib=/usr/lib/basalt/engine
+home="${BASALT_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/basalt}"
+app="$home/app"
+models="$home/models"
+cfg="${BASALT_CONFIG:-$home/basalt_config.json}"
+stamp="$(cat "$share/PKG_VERSION")"
+
+if [ "$(cat "$app/.pkg-version" 2>/dev/null)" != "$stamp" ]; then
+  mkdir -p "$app/bin" "$models"
+  for d in serve tools data include src cmake tests; do ln -sfn "$share/$d" "$app/$d"; done
+  for f in CMakeLists.txt requirements.txt requirements-test.txt README.md; do
+    ln -sfn "$share/$f" "$app/$f"
+  done
+  for b in basalt basalt-vision basalt-bench basalt-probe; do
+    [ -e "$lib/$b" ] && ln -sf "$lib/$b" "$app/bin/$b"
+  done
+  echo "$stamp" > "$app/.pkg-version"
+  echo "basalt: set up $app" >&2
+  echo "basalt: model packs go to $models (a .basalt file is weights + tokenizer + drafter + vision)" >&2
+fi
+
+# A first run gets a starter config: the newest pack in models/, single GPU, loopback only.
+if [ ! -f "$cfg" ]; then
+  pack="$(ls -1t "$models"/*.basalt 2>/dev/null | head -1)"
+  mkdir -p "$(dirname "$cfg")"
+  cat > "$cfg" <<JSON
+{
+  "server": {
+    "model": "${pack:-$models/CHANGE-ME.basalt}",
+    "gpu": "0",
+    "host": "127.0.0.1",
+    "port": 8081,
+    "vision": "dynamic"
+  },
+  "engine": {
+    "max-context": 32768,
+    "kv": "int8",
+    "resident-experts": true,
+    "vram-reserve-mib": 1024
+  }
+}
+JSON
+  echo "basalt: wrote $cfg" >&2
+fi
+
+cd "$app"
+
+serve_tree() {
+  # the same thing `basalt serve` does, from the installed tree instead of the build tree
+  local args=()
+  [ -f "$cfg" ] && args+=(--config "$cfg")
+  # a bare MODEL.basalt argument stands for --model, as it does for `basalt serve`
+  if [ -n "${1:-}" ] && [ "${1:0:1}" != '-' ] && [ "${1##*.}" = basalt ]; then
+    args+=(--model "$(realpath -- "$1")")
+    shift
+  fi
+  exec python3 -m serve.server --engine-bin "$app/bin/basalt" "${args[@]}" "$@"
+}
+
+# `shift` with no positional parameters returns 1; under `set -e` that ended the script, so a bare
+# `basalt` exited silently instead of starting the server.
+sub="${1:-serve}"
+if [ "$#" -gt 0 ]; then shift; fi
+
+case "$sub" in
+  serve) serve_tree "$@" ;;
+  engine) exec "$app/bin/basalt" "$@" ;;
+  bench) exec "$app/bin/basalt-bench" --engine "$app/bin/basalt" --fixtures "$share/data/bench" "$@" ;;
+  probe) exec "$app/bin/basalt-probe" --engine "$app/bin/basalt" --fixtures "$share/data/bench" "$@" ;;
+  vision) exec "$app/bin/basalt-vision" "$@" ;;
+  config)
+    echo "home:    $home"
+    echo "app:     $app"
+    echo "models:  $models"
+    echo "config:  $cfg"
+    echo "engine:  $lib (package tree $share, docs /usr/share/doc/basalt-engine-git)"
+    [ -f "$cfg" ] && cat "$cfg"
+    ;;
+  help|-h|--help) sed -n '2,13p' "$0" ;;
+  *) echo "basalt: unknown command '$1' (basalt help)" >&2; exit 2 ;;
+esac
+EOF
+  chmod 755 "$pkgdir/usr/bin/basalt"
+
+  # --- licenses -----------------------------------------------------------------------------------
+  cd "$srcdir/$_src_dir"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 THIRD_PARTY_LICENSES "$pkgdir/usr/share/licenses/$pkgname/THIRD_PARTY_LICENSES"
+}
