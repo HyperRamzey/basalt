@@ -16,6 +16,13 @@ Artifacts: `ab/ab-kv-resident-20261101_052142.md`, `tune/tune-20261101_072507.md
 | `engine.conversation-cache-disk-mib` | absent (RAM tier only) | `4096` | `basalt_tune.sh --restart-at 3`, same 4-turn transcript, engine restarted between turns 2 and 3: with the tier **118 677 reused / 40 290 read** and mean later-turn ttft **1.20 s** and **12 776** file blob reads; without it 79 153 / 79 814, **5.23 s**, 30 067. Containers land in `~/.cache/basalt/<model hash>/conversations/*.bcs` (810 MB in the test, capped by the budget). PR #149 wrote the tier, PR #150 made the files `0600`. |
 | `engine.spec` | `7` (copied from strata) | `12` | 3-arm sweep, 6 turns, cold per arm, identical reuse in all three arms (`199 590 / 41 151`), `max_tokens 1024`: `spec 7` **55.9** t/s decode (55.5 in the replicate), 90.0 % acceptance, 3 743 deferred swaps, 72 556 file reads; **`spec 12` 57.2 t/s** (57.3 in the replicate), 88.5 %, **3 001**, **66 968**; `spec 16` 55.4 t/s. `spec 10` measured 57.6 t/s in a 4-turn arm — the gain plateaus between 10 and 12 and falls off by 16. |
 
+## changed (2026-11-03, the resident headroom round)
+
+| key | before | after | backing |
+| --- | --- | --- | --- |
+| `engine.resident-headroom-slack-gib` | absent (0) | `2` | new flag `--resident-headroom-slack-gib`; the engine's own line went from `minus the 11 GiB safety headroom` to `39.73 GiB available minus 9 GiB headroom`, copy 30.47 GiB page-locked. Details and the honest caveat (the copy is bounded by the RAM free at plan time; no t/s measured): [stack-20261103.md](stack-20261103.md). |
+| `engine.prompt-cache` | `3` | `2` | a checkpoint is ~118 MiB of RAM the resident copy cannot use, and the round below found 3 and 6 equal on reuse; 2 gives the RAM back to the experts. |
+
 ## kept, with the evidence that kept it
 
 | key | value | backing |

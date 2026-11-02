@@ -1,6 +1,6 @@
 # Maintainer: sanjxz (local build, mirrors packaging/PKGBUILD.strata-engine-git)
 pkgname=basalt-engine-git
-pkgver=0.1.0.r2271.gc7bf051c
+pkgver=0.1.0.r2329.g130c259a
 pkgrel=1
 pkgdesc='Run Qwen3.8-Flash-Next (125B MoE) on one NVIDIA Blackwell GPU plus system RAM, with a local OpenAI/Anthropic-compatible API (git version)'
 arch=('x86_64')

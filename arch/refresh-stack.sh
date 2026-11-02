@@ -10,6 +10,7 @@ SRC=${SRC:-$HERE/src/basalt}
 REF=${REF:-makepkg}
 BASE_REF=${BASE_REF:-876e47e8}
 CHECK=${CHECK:-/tmp/basalt-patchcheck}
+SERIES=${SERIES:-0.2.0}   # the upstream series the pinned BASE belongs to (v0.2.0 is the .basalt version 2 release)
 
 say() { printf '%s\n' "$*"; }
 
@@ -18,10 +19,14 @@ say() { printf '%s\n' "$*"; }
 BASE=$(git -C "$SRC" rev-parse "$BASE_REF")
 TIP=$(git -C "$SRC" rev-parse "$REF")
 TREE=$(git -C "$SRC" rev-parse "$REF^{tree}")
-VER=$(printf '0.1.0.r%s.g%s' "$(git -C "$SRC" rev-list --count "$REF")" "$(git -C "$SRC" rev-parse --short "$REF")")
+VER=$(printf '%s.r%s.g%s' "$SERIES" "$(git -C "$SRC" rev-list --count "$REF")" "$(git -C "$SRC" rev-parse --short "$REF")")
 
 mkdir -p "$HERE/patches"
-git -C "$SRC" diff "$BASE" "$TIP" > "$HERE/patches/basalt-stack.patch"
+# --binary, not plain `git diff`: the stack adds a binary file (data/profiles/*.prof), and without it
+# git writes the stub line `Binary files ... differ`, which `git apply` refuses ("cannot apply binary
+# patch without full index line") - so neither this check nor the PKGBUILD's prepare() could reproduce
+# the stack from a clean clone.  --binary implies --full-index, which makes the patch self-contained.
+git -C "$SRC" diff --binary "$BASE" "$TIP" > "$HERE/patches/basalt-stack.patch"
 printf '%s\n' "$BASE" > "$HERE/patches/BASE"
 printf '%s\n' "$TIP"   > "$HERE/patches/TIP"
 printf '%s\n' "$TREE"  > "$HERE/patches/TREE"
