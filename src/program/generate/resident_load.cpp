@@ -68,7 +68,11 @@ int resident_load(Context& context) {
             ram_floor_bytes =
                 basalt::platform::ram_floor(margin, file_bytes, complement, largest_layer_bytes, prompt_file_bytes);
             if (avail > 0 && file_bytes > 0) {
-                const uint64_t safe = basalt::platform::max_safe_copy(avail, late, ram_floor_bytes);
+                // The room the copy may take, with --resident-headroom-slack-gib taken off the floor it is sized from
+                // (the margin stays in it, as below), so this line and the refusal of too high a budget describe the
+                // copy the source is about to build rather than the one without the slack.
+                const uint64_t slack_floor = headroom_with_slack(ram_floor_bytes + late, o.resident_headroom_slack, margin);
+                const uint64_t safe = avail > slack_floor ? avail - slack_floor : 0;
                 constexpr double kGiB = 1073741824.0;
                 if (o.resident_budget > 0 && o.resident_budget > safe) {
                     return fatal_start_error(
@@ -86,6 +90,12 @@ int resident_load(Context& context) {
                              (double) avail / kGiB);
             }
         }
+        // The headroom the copy is checked against, with the user's --resident-headroom-slack-gib taken off it once,
+        // here, after the file cache's floor was folded in: that much more of the complement is page-locked in RAM
+        // instead of read from the SSD while generating.  The RAM margin stays free whatever the slack says -
+        // pin_cache_complement applies the same floor, so a slack bigger than the headroom changes nothing.
+        resident_headroom = headroom_with_slack(resident_headroom, o.resident_headroom_slack,
+                                                basalt::platform::ram_margin());
         std::vector<std::pair<int32_t, int32_t>> gpu_only = peer_only;
         gpu_only.insert(gpu_only.end(), stage_held.begin(), stage_held.end());
         const auto& rank = stages.empty() ? profile : profile_all;

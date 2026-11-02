@@ -41,6 +41,7 @@ struct AutoInputs {
     uint64_t extra_full = 0;              ///< optional copies beside complement_full (lent slots, adapt spares): kept as far as RAM allows
     uint64_t extra_peer_excl = 0;         ///< the same beside complement_peer_excl
     uint64_t floor_bytes = 0;             ///< RAM that must stay free beside the copy when every complement expert is in it
+    uint64_t headroom_slack_bytes = 0;    ///< --resident-headroom-slack-gib: taken off the floor (see headroom_with_slack)
     // The floor when some experts are read from the file instead (platform::ram_floor, plus late_bytes).
     uint64_t margin_bytes = 0;
     uint64_t late_bytes = 0;              ///< RAM the engine takes after the copy
@@ -48,6 +49,18 @@ struct AutoInputs {
     uint64_t prompt_file_bytes = 0;       ///< what a prompt chunk reads from the file for lent slots the copy leaves out
     AutoGiven given;
 };
+
+/// The RAM the resident copy of the experts leaves free: the floor the plan computed (`floor_bytes`, which is
+/// `AutoInputs::floor_bytes` or that plus the file cache's floor and what loads after the copy) with
+/// `--resident-headroom-slack-gib` (`slack_bytes`) taken off, so that much more of the complement is copied into RAM
+/// instead of read from the SSD while generating.  `margin_bytes` (platform::ram_margin()) is the floor: the loader
+/// (FileExpertSource::pin_cache_complement) refuses to go under it either, so on a run whose headroom is only the
+/// margin - one without --serve - the slack changes nothing.  A slack past the headroom the plan computed comes out
+/// of the OS file cache's floor, which is what a machine that leaves experts on the SSD is trading.
+inline uint64_t headroom_with_slack(uint64_t floor_bytes, uint64_t slack_bytes, uint64_t margin_bytes) noexcept {
+    const uint64_t cut = slack_bytes < floor_bytes ? floor_bytes - slack_bytes : 0;
+    return cut > margin_bytes ? cut : margin_bytes;
+}
 
 enum class AutoSource { Auto, Given };
 

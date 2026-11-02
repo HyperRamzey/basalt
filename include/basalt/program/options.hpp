@@ -74,6 +74,14 @@ struct Options {
     /// (with a warning) when even the experts no slot holds do not fit.
     bool resident_pin = false;
     uint64_t resident_headroom = 8ull << 30;
+    /// `--resident-headroom-slack-gib N`: N GiB taken off the safety headroom the resident copy of the experts is
+    /// sized from, which is max(`--resident-headroom`, the RAM margin plus what loads after the copy and what the
+    /// server takes while it serves).  N GiB more of the complement is then copied into RAM instead of read from the
+    /// SSD while generating.  The RAM margin itself stays free whatever this says - it is the floor
+    /// `FileExpertSource::pin_cache_complement` applies too - so on a run whose headroom is only the margin (no
+    /// --serve) the flag changes nothing.  A slack past the headroom the plan computed comes out of the OS file
+    /// cache's floor: that is the trade a machine that leaves experts on the SSD is asking for.  0 = nothing off.
+    uint64_t resident_headroom_slack = 0;
     bool resident_soft = false;
     bool resident_cpu_explicit = false;   // --resident-cpu-experts given by itself (not only implied)
     /// CS-T `--resident-budget-gib N`: the resident mode with a RAM budget - the N GiB of experts the GPU cache does

@@ -12,18 +12,23 @@ namespace {
 constexpr double kGiB = 1073741824.0;
 
 bool fits(uint64_t complement, const AutoInputs& in) {
-    return in.ram_available >= in.floor_bytes && complement <= in.ram_available - in.floor_bytes;
+    const uint64_t floor = headroom_with_slack(in.floor_bytes, in.headroom_slack_bytes, in.margin_bytes);
+    return in.ram_available >= floor && complement <= in.ram_available - floor;
 }
 
 // The RAM that stays free beside a copy of up to `complement` bytes: the headroom when all of it fits, else the
 // file cache's floor, which depends on how much is left to the file, which depends on the floor.  The iteration
 // starts from everything on the file and only goes down, so the floor it ends on never undercounts.
 uint64_t floor_for(uint64_t complement, const AutoInputs& in) {
-    if (fits(complement, in)) return in.floor_bytes;
-    uint64_t file = complement, floor = in.floor_bytes;
+    // the slack is taken off the floor the plan ends on, once: it is the same headroom the loader sizes the copy
+    // from (see headroom_with_slack), so the auto pick and the resident copy agree on how much RAM is left free
+    const auto slacken = [&in](uint64_t floor) { return headroom_with_slack(floor, in.headroom_slack_bytes, in.margin_bytes); };
+    if (fits(complement, in)) return slacken(in.floor_bytes);
+    uint64_t file = complement, floor = slacken(in.floor_bytes);
     for (int i = 0; i < 16; ++i) {
-        floor = (std::max)(in.floor_bytes, basalt::platform::ram_floor(in.margin_bytes, file, complement, in.layer_bytes,
-                                                                       in.prompt_file_bytes) + in.late_bytes);
+        floor = slacken((std::max)(in.floor_bytes, basalt::platform::ram_floor(in.margin_bytes, file, complement,
+                                                                               in.layer_bytes,
+                                                                               in.prompt_file_bytes) + in.late_bytes));
         file = complement - (std::min)(complement, in.ram_available > floor ? in.ram_available - floor : 0);
     }
     return floor;

@@ -177,6 +177,32 @@ int main() {
         in.ram_available = 10 * G;                  // little RAM: a sane floor, not a negative copy
         CHECK(choose_auto(in).resident_bytes == 0);
     }
+    {   // --resident-headroom-slack-gib: the headroom the resident copy is sized from, with the slack taken off it;
+        // never below the RAM margin, and never below what the experts left on the file need the OS cache to hold
+        CHECK(headroom_with_slack(5 * G, 2 * G, 2 * G) == 3 * G);
+        CHECK(headroom_with_slack(5 * G, 0, 2 * G) == 5 * G);              // 0 = the engine's own figure
+        CHECK(headroom_with_slack(3 * G, 2 * G, 2 * G) == 2 * G);          // the margin stays free whatever it asks
+        AutoInputs in = base(128, false);
+        in.floor_bytes = 12 * G; in.margin_bytes = 6 * G; in.late_bytes = 0;
+        in.complement_full = 217 * G / 10; in.ram_available = 28 * G;   // part of it stays on the file
+        const AutoPlan plain = choose_auto(in);
+        CHECK(plain.resident_bytes == 16 * G);                            // the 12 GiB headroom is what limits the copy
+        in.headroom_slack_bytes = 2 * G;
+        const AutoPlan slack = choose_auto(in);
+        CHECK(slack.resident_bytes == 18 * G);                            // the same machine with a 10 GiB headroom
+        CHECK(slack.resident_bytes <= in.complement_full);
+        const uint64_t file = in.complement_full - slack.resident_bytes;
+        // the floor it was sized against, shortened by the slack and nothing more; the RAM margin stays in it
+        CHECK(slack.resident_bytes + basalt::platform::ram_floor(in.margin_bytes, file, in.complement_full,
+                                                                in.layer_bytes, in.prompt_file_bytes) <=
+              in.ram_available + 2 * G);
+        // A slack past the headroom the plan computed comes out of the file cache's floor, never past the margin.
+        in.headroom_slack_bytes = 40 * G;
+        const AutoPlan all = choose_auto(in);
+        CHECK(all.resident_bytes >= slack.resident_bytes && all.resident_bytes <= in.complement_full);
+        CHECK(all.resident_bytes + in.margin_bytes <= in.ram_available);
+        CHECK(all.resident_bytes == choose_auto(in).resident_bytes);       // idempotent: the same floor every time
+    }
     // Per-request K/V placement: shallow requests stay in VRAM, deep ones go to host RAM when it holds them.
     {
         KvHostInputs in;

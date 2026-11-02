@@ -209,7 +209,15 @@ void usage() {
                  "  --resident-budget-gib N  the resident mode with at most N GiB of experts in RAM (hottest first;\n"
                  "                       auto when not set: what fits);\n"
                  "                       a budget that would leave less than the RAM floor free is refused, naming\n"
-                 "                       the largest safe value.\n");
+                 "                       the largest safe value.\n"
+                 "  --resident-headroom-slack-gib N  take N GiB off the safety headroom the resident copy of the\n"
+                 "                       experts is sized from (that headroom is the RAM margin plus what loads after\n"
+                 "                       the copy and what a server takes while it serves), so N GiB more of the\n"
+                 "                       complement is copied into RAM instead of read from the SSD while generating.\n"
+                 "                       The RAM margin itself always stays free, so a run whose headroom is only the\n"
+                 "                       margin (no --serve) is unchanged; a slack past the headroom the plan\n"
+                 "                       computed comes out of the OS file cache's floor.  Default 0 = nothing off.\n"
+                 "                       Watch the first requests: if the machine starts swapping, lower it.");
 }
 
 }  // namespace basalt::program::cli

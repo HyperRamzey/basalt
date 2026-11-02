@@ -276,6 +276,14 @@ std::optional<int> parse_options(int argc, char** argv, Options& o, std::string&
             o.mmap_experts = o.resident_cpu_experts = o.resident_pin = true;
             o.resident_headroom = 0;
         }
+        else if (a == "--resident-headroom-slack-gib") {
+            const double gib = std::atof(next("--resident-headroom-slack-gib"));
+            if (!(gib >= 0.0) || !(gib < 1024.0)) {
+                basalt::log::error("basalt generate", "--resident-headroom-slack-gib needs 0 <= N < 1024");
+                return 2;
+            }
+            o.resident_headroom_slack = (uint64_t) (gib * 1073741824.0);
+        }
         else if (a == "--stats") o.stats = true;
         else if (a == "--profile") basalt::core::diagnostics().profile = true;
         else if (a == "--wait-stats") basalt::core::diagnostics().wait_stats = true;

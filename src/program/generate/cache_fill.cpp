@@ -87,7 +87,11 @@ int cache_fill(Context& context) {
             uint64_t outside = expert_total_bytes - cache_bytes_now;   // the experts no cache on the primary holds
             const uint64_t late = o.serve ? basalt::platform::kLateHostBytes + serve_growth_bytes(o, g) : 0;
             const uint64_t headroom = std::max(o.resident_headroom, basalt::platform::ram_margin() + late);
-            uint64_t ram = *free_ram > headroom ? *free_ram - headroom : 0;
+            // --resident-headroom-slack-gib, applied where the headroom is spent (once per branch, below), so this
+            // estimate of the resident copy matches the one the loader makes in resident_load.cpp
+            const uint64_t copy_headroom = headroom_with_slack(headroom, o.resident_headroom_slack,
+                                                               basalt::platform::ram_margin());
+            uint64_t ram = *free_ram > copy_headroom ? *free_ram - copy_headroom : 0;
             if (o.resident_cpu_experts && (o.resident_budget > 0 || o.resident_soft)) {
                 const uint64_t margin = 256ull << 20;
                 ram = ram > margin ? ram - margin : 0;
@@ -108,7 +112,9 @@ int cache_fill(Context& context) {
                     file_headroom =
                         std::max(headroom, basalt::platform::ram_floor(basalt::platform::ram_margin(), outside, outside, largest,
                                                     basalt::platform::kPromptFileReadBytes) + late);
-                    ram = *free_ram > file_headroom ? *free_ram - file_headroom : 0;
+                    const uint64_t file_copy_headroom = headroom_with_slack(file_headroom, o.resident_headroom_slack,
+                                                                            basalt::platform::ram_margin());
+                    ram = *free_ram > file_copy_headroom ? *free_ram - file_copy_headroom : 0;
                     if (o.resident_soft) ram = ram > (256ull << 20) ? ram - (256ull << 20) : 0;
                 }
                 ram = std::min(ram, outside);

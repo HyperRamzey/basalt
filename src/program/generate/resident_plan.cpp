@@ -236,6 +236,7 @@ int resident_plan(Context& context) {
         in.extra_peer_excl = lent_bytes + spares_excl;
         // the floor when the whole complement is placed is the headroom; with experts left on the SSD the plan adds the file cache's
         in.floor_bytes = head;
+        in.headroom_slack_bytes = o.resident_headroom_slack;   // --resident-headroom-slack-gib (see headroom_with_slack)
         in.margin_bytes = margin;
         in.late_bytes = late;
         in.layer_bytes = largest_layer_bytes;
