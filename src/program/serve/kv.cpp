@@ -243,7 +243,6 @@ bool Runtime::peer_due_apply(std::string& e) {
     peer_due_off = 0;
     return true;
 }
-}
 
 // `shrink` false: only VRAM that is free now (a prompt read is running beside the windows, its loan in the
 // cache's last slots) - false with `e` empty when that is not enough
