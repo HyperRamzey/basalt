@@ -40,7 +40,7 @@ bool cpu_avx512bw_ok();
 /// Whether this CPU (and its OS) runs the AVX2 kernels (AVX, AVX2, FMA, F16C): the floor of every expert kernel
 /// (q2_avx2.cpp, iq_avx2.cpp, and the ggml dot products).
 bool cpu_avx2_ok();
-/// Whether this CPU (and its OS) also has the 256-bit AVX-VNNI instructions (`vpdpwssd`, `vpdpbusd`).
+/// Whether this CPU (and its OS) also has the 256-bit AVX-VNNI instructions (`vpdpwssd`, `vpdpbusd`) and BMI2.
 bool cpu_avxvnni_ok();
 /// Whether this CPU (and its OS) also has the 256-bit AVX-VNNI-INT8 instructions (`vpdpbssd`).
 bool cpu_avxvnni_int8_ok();

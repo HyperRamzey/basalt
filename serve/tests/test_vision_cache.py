@@ -39,8 +39,12 @@ def dynamic():
     return v
 
 
-def key(source):
-    return hashlib.sha256(source.encode()).hexdigest()[:32]
+def key(name):
+    return hashlib.sha256(name.encode()).hexdigest()[:32]
+
+
+def blobs(names):
+    return [n.encode() for n in names]
 
 
 PATHS = {"sidecar": sidecar, "dynamic": dynamic}
@@ -48,11 +52,6 @@ PATHS = {"sidecar": sidecar, "dynamic": dynamic}
 
 class VisionCache(unittest.TestCase):
     def setUp(self):
-        for cls in (Vision, EngineVision):
-            for name, fake in (("load", lambda s: s.encode()), ("normalize", lambda d: d)):
-                p = mock.patch.object(cls, name, side_effect=fake)
-                p.start()
-                self.addCleanup(p.stop)
         p = mock.patch.object(vision, "VISION_CACHE_BYTES", BUDGET)
         p.start()
         self.addCleanup(p.stop)
@@ -66,9 +65,9 @@ class VisionCache(unittest.TestCase):
                 finally:
                     shutil.rmtree(v.dir, ignore_errors=True)
 
-    def readable(self, v, sources):
-        combined, counts = v.encode(sources)
-        return combined.read_bytes() == SVE * len(sources) and counts == [7] * len(sources)
+    def readable(self, v, names):
+        combined, counts = v.encode(blobs(names))
+        return combined.read_bytes() == SVE * len(names) and counts == [7] * len(names)
 
     def test_a_request_with_more_images_than_fit(self):
         for v in self.each_path():
@@ -98,7 +97,7 @@ class VisionCache(unittest.TestCase):
     def test_least_recently_used_goes_first(self):
         for v in self.each_path():
             for images in ([f"i{n}" for n in range(64)], ["i0"], ["new"]):
-                v.encode(images)
+                v.encode(blobs(images))
             self.assertIn(key("i0"), v.cache)
             self.assertNotIn(key("i1"), v.cache)
             self.assertFalse((v.dir / f"{key('i1')}.sve").exists())
@@ -106,7 +105,7 @@ class VisionCache(unittest.TestCase):
     def test_the_budget_is_bytes(self):
         for v in self.each_path():
             with mock.patch.object(vision, "VISION_CACHE_BYTES", 10 * len(SVE)):
-                v.encode([f"i{n}" for n in range(30)])
+                v.encode(blobs(f"i{n}" for n in range(30)))
                 self.assertEqual(len(v.cache), 10)
                 self.assertEqual(sum(path.stat().st_size for path, _, _ in v.cache.values()), 10 * len(SVE))
                 self.assertEqual(v.cache_bytes, 10 * len(SVE))
@@ -123,7 +122,7 @@ class VisionCache(unittest.TestCase):
 
             def pausing(sources, pins):
                 encoded = encode_pinned(sources, pins)
-                if sources is a_images:
+                if sources[0] == b"a0":                 # request A's images
                     holding.set()
                     b_done.wait(30)
                 return encoded
@@ -157,7 +156,7 @@ class VisionCache(unittest.TestCase):
                 return encoded
             v._encode_pinned = vanishing
             with self.assertRaises(FileNotFoundError):
-                v.encode(["a", "b"])
+                v.encode(blobs(["a", "b"]))
             self.assertEqual(list(v.dir.glob("req-*.sve")), [])
             self.assertEqual(v.pinned, {})
 

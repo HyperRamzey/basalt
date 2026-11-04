@@ -13,7 +13,6 @@
 #include "basalt/core/device.hpp"
 #include "basalt/core/diag.hpp"
 #include "basalt/core/draft_cum.hpp"
-#include "basalt/core/remote_expert_opt.hpp"
 #include "basalt/core/expert_cache.hpp"
 #include "basalt/core/conversation_snapshot.hpp"
 #include "basalt/core/conversation_memory.hpp"
@@ -25,7 +24,6 @@
 #include "basalt/platform/memory.hpp"
 #include "basalt/platform/process.hpp"
 #include "basalt/platform/system.hpp"
-#include "basalt/core/remote_experts.hpp"
 #include "basalt/core/on_device.hpp"
 #include "basalt/core/peer_experts.hpp"
 #include "basalt/core/layer.hpp"
@@ -360,6 +358,7 @@ private:
     int64_t chunk_full{};
     int64_t kKvGrowCells{};
     static constexpr int64_t kKvWindowCells = 2* basalt::kernels::kVerifyMaxT + 64;   // a decoding session's next window
+    static constexpr int64_t kPeerTakeCells = 32768;   // a fit backing this many new cells hands its experts to the peer
     int64_t kv_moves{};
     bool kv_short{};
     bool kv_keep_routed{};   // an admission while slots decode: a shrink keeps their routed experts
@@ -378,6 +377,11 @@ private:
     // it keeps once the outgoing conversation is parked (kv_host_back)
     bool kv_host_late{};
     int64_t kv_host_fresh{};        // a session not streamed yet takes a pool only for a read of at most this many tokens
+    // a solo request's fits before its prompt read leave their handoffs to the peer to that read: (peer slot, its
+    // expert, the expert it takes), done by the split's loan of the slot or else before the first window
+    bool peer_defer{};
+    std::vector<std::array<int32_t, 3>> peer_due{};
+    int64_t peer_due_off{}, peer_due_lent_n{};
     // ---- --batch: the slots of the batch windows
     struct BSlot {
         bool active = false, stop = false;
@@ -569,6 +573,9 @@ private:
                            const std::vector<serve_loans::LentEntry>* lent_out = nullptr);
     bool kv_drain(std::string& e);
     bool cache_regrow(std::string& e);
+    bool peer_take(const std::vector<int32_t>& off, std::string& e);
+    void peer_due_lent(std::vector<std::pair<int32_t, int32_t>>& lent);
+    bool peer_due_apply(std::string& e);
     bool kv_fit(basalt::core::SessionState& s, int64_t cells, std::string& e, bool shrink = true, int64_t min_cells = -1);
     bool kv_release(basalt::core::SessionState& s, int64_t cells, std::string& e);
     int64_t kv_keep_cells(const basalt::core::SessionState& s);

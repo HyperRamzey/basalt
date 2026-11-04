@@ -587,7 +587,7 @@ void mid_chain_init() {
               cudaMemset(d.cnt, 0, (2 * NCTR + 1) * 4) == cudaSuccess &&
               cudaMalloc((void**) &d.abv, (size_t) R_HV * 2 * XT * 4) == cudaSuccess &&
               cudaMemcpyToSymbol(mkb_word, &word, sizeof word) == cudaSuccess;
-    // one set of attributes per window instance the picker can hand out: 1..4 and the run-time-rows instance
+
     for (const int t : {1, 2, 3, 4, XT}) {
         if (!ok) break;
         ok = cudaFuncSetAttribute((const void*) mid_pick(t, 0, 0, 0), cudaFuncAttributeMaxDynamicSharedMemorySize, SMEM_MAX) == cudaSuccess;

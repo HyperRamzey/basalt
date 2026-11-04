@@ -9,7 +9,7 @@ tests and the quality gate run on a machine with a card.
 | | Linux | Windows |
 | --- | --- | --- |
 | OS | x86-64, AVX2 (AVX-512 used when present) | Windows 10 1903 or later, x64 |
-| Compiler | C++20 (GCC or Clang) | Visual Studio 2022 (MSVC 19.44) |
+| Compiler | GCC 13 or newer | Visual Studio 2022 (MSVC 19.44) |
 | CUDA | 13 | 13 |
 | Build | CMake 3.24+ | CMake 3.24+ and Ninja |
 | Python | 3.10+ | 3.10+ |
@@ -25,12 +25,13 @@ behind one declaration, and a test in `tests/platform/` that runs on both.
 | seam | header | wraps |
 | --- | --- | --- |
 | file I/O | `file.hpp` | UTF-8 paths, open, positional reads, unbuffered descriptors |
+| unbuffered reads | `direct_file.hpp` | asynchronous unbuffered file reads (the n-gram table) |
 | file views | `mapped_file.hpp` | mapped files, prefetch and release hints, locking |
 | memory | `memory.hpp` | RAM probes, page locking, aligned and huge-page allocation |
 | CPU | `cpu.hpp` | topology |
 | processes | `process.hpp` | spawn, wait, terminate, pipes, signals |
 | system | `system.hpp`, `dynlib.hpp` | process memory, disk queries, full speed in the background, the NVML loader |
-| compiler | `compiler.hpp` | CPUID, bit scan, spin hint, fp16 rounding |
+| compiler | `compiler.hpp`, `format_check.hpp` | CPUID, bit scan, spin hint, fp16 rounding, printf-format checking |
 | Win32 | `win.hpp` | the only inclusion of `windows.h` |
 
 Programs that take paths carry a manifest (`src/platform/basalt.exe.manifest`) that makes the
