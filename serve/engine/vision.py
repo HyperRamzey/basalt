@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import os
+import queue
 import subprocess
 import tempfile
 import threading
 import time
 import uuid
-import queue
 from pathlib import Path
 
 from serve.engine import lifeline
@@ -124,6 +124,7 @@ class Vision:
         ignores the tag. False without Pillow, or when the tag is missing, 1 or unreadable."""
         try:
             import io
+
             from PIL import Image
             with Image.open(io.BytesIO(data), formats=["JPEG"]) as im:
                 return im.getexif().get(0x0112, 1) not in (None, 0, 1)
@@ -147,6 +148,7 @@ class Vision:
         """The image through Pillow, as a PNG."""
         try:
             import io
+
             from PIL import Image, UnidentifiedImageError
         except ImportError:
             raise ValueError("this image format needs Pillow (python -m pip install pillow); JPEG, PNG, BMP and "
@@ -188,8 +190,7 @@ class Vision:
             combined = self.dir / f"req-{uuid.uuid4().hex[:12]}.sve"
             try:
                 with open(combined, "wb") as f:
-                    for path, _, _ in encoded:
-                        f.write(path.read_bytes())
+                    f.writelines(path.read_bytes() for path, _, _ in encoded)
             except BaseException:                       # no partial file is left behind
                 combined.unlink(missing_ok=True)
                 raise

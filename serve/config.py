@@ -11,9 +11,8 @@ from pathlib import Path
 from serve import ROOT
 from serve.engine.flags import flag_index
 from serve.engine.image_source import parse_url_host
-from serve.engine.vision import VISION_MODES, VISION_USAGE, vision_mode
+from serve.engine.vision import VISION_USAGE, vision_mode
 from serve.util.console import tagged
-
 
 MIN_SLOT_CONTEXT = 256          # the least context a slot is given when --max-context is shared
 ENGINE_DEFAULT_CONTEXT = 4096     # the engine's context without --max-context
@@ -130,7 +129,7 @@ def load_config_file(path: str, ap: argparse.ArgumentParser) -> tuple[list[str],
                 raise ValueError(f"server.{key}: expected a string or number, not {item!r}")
             item = str(item)
             if name in CONFIG_PATHS and item:
-                item = str((here / os.path.expanduser(item)))
+                item = str(here / os.path.expanduser(item))
             argv += [flag, item]
     engine: list[str] = []
     for key, value in sections["engine"].items():
@@ -330,7 +329,8 @@ def sampling_line(effective: dict, cli: set[str], config: set[str]) -> str:
     """The startup line for the effective sampling defaults, each marked with where it came from: the keys in
     `cli` were typed on the command line, those in `config` come from the config file; the rest are the model
     file's."""
-    mark = lambda k: "(cli)" if k in cli else "(config)" if k in config else ""
+    def mark(k: str) -> str:
+        return "(cli)" if k in cli else "(config)" if k in config else ""
     shown = " ".join(f"{SAMPLING_NAMES.get(k, k)}={v}{mark(k)}" for k, v in effective.items())
     return tagged("sampling", shown)
 
