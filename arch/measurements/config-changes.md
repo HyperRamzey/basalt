@@ -23,6 +23,13 @@ Artifacts: `ab/ab-kv-resident-20261101_052142.md`, `tune/tune-20261101_072507.md
 | `engine.resident-headroom-slack-gib` | absent (0) | `2` | new flag `--resident-headroom-slack-gib`; the engine's own line went from `minus the 11 GiB safety headroom` to `39.73 GiB available minus 9 GiB headroom`, copy 30.47 GiB page-locked. Details and the honest caveat (the copy is bounded by the RAM free at plan time; no t/s measured): [stack-20261103.md](stack-20261103.md). |
 | `engine.prompt-cache` | `3` | `2` | a checkpoint is ~118 MiB of RAM the resident copy cannot use, and the round below found 3 and 6 equal on reuse; 2 gives the RAM back to the experts. |
 
+## changed (2026-11-05, the v0.2.1 stack + adapt-margin round)
+
+| key | before | after | backing |
+| --- | --- | --- | --- |
+| `engine.adapt-margin` | absent (1.5) | `3.0` | PR #231 flag `--adapt-margin`: sets the count margin needed before a missing expert displaces a resident one during adaptive rounds. With `adapt-every: 1`, a margin of 3.0 prevents thrashing/premature swaps. |
+| `server.model` | `Qwen3.8-FN-GSQ-RCO-IQ3_XXS.v2.basalt` | `Qwen3.8-FN-UD-Q4_K_XL.v2.basalt` | UD-Q4_K_XL pack migrated to `.basalt` v2 format with `--compat-bf16` and installed to `~/.local/share/basalt/models/`. |
+
 ## kept, with the evidence that kept it
 
 | key | value | backing |

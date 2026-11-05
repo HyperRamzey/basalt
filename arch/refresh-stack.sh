@@ -8,9 +8,9 @@ set -euo pipefail
 HERE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SRC=${SRC:-$HERE/src/basalt}
 REF=${REF:-makepkg}
-BASE_REF=${BASE_REF:-876e47e8}
+BASE_REF=${BASE_REF:-bbf2f5bb}
 CHECK=${CHECK:-/tmp/basalt-patchcheck}
-SERIES=${SERIES:-0.2.0}   # the upstream series the pinned BASE belongs to (v0.2.0 is the .basalt version 2 release)
+SERIES=${SERIES:-0.2.1}   # the upstream series the pinned BASE belongs to (v0.2.1)
 
 say() { printf '%s\n' "$*"; }
 

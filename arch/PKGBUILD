@@ -1,6 +1,6 @@
 # Maintainer: sanjxz (local build, mirrors packaging/PKGBUILD.strata-engine-git)
 pkgname=basalt-engine-git
-pkgver=0.1.0.r2329.g130c259a
+pkgver=0.2.1.r2398.g3b298095
 pkgrel=1
 pkgdesc='Run Qwen3.8-Flash-Next (125B MoE) on one NVIDIA Blackwell GPU plus system RAM, with a local OpenAI/Anthropic-compatible API (git version)'
 arch=('x86_64')
@@ -33,6 +33,9 @@ options=('!lto' '!debug')
 
 # CMakeLists.txt refuses anything but compute capability 12.0, so there is nothing to widen here.
 _cuda_archs=120
+# Tuning flags for this host: AMD Zen 3 + GCC LTO, and Blackwell sm_120 L1 cache-all.
+: "${_cxx_flags:=-march=znver3 -mtune=znver3 -flto=auto}"
+: "${_cuda_flags:=-Xptxas -O3,-dlcm=ca}"
 # Also build basalt-vision, the image-encoder sidecar. Skip it: _build_vision=0 makepkg -si
 : "${_build_vision:=1}"
 # nvcc is memory hungry and this box may be running another engine at the same time: a quarter of the cores.
@@ -65,8 +68,8 @@ pkgver() {
 # consumes is the checked-in result of that work: `patches/basalt-stack.patch`, the diff from the pinned commit to
 # the stack tip, so a clean clone of upstream plus this PKGBUILD reproduces the installed stack exactly.
 #
-#   merged clean:    179 174 167 166 67 127 177 176 175 178 112 170 150 156 181 182 183
-#   hand-resolved:   114 115 117 128 129 149 155 157 159 100 101 107 66 89 75
+#   merged clean:    179 174 167 166 67 127 177 176 175 178 112 170 150 156 181 182 183 231 186
+#   hand-resolved:   114 115 117 128 129 149 155 157 159 100 101 107 66 89 75 232
 #   not taken:       13 87 (expert formats / pack types this pack does not carry), 68 96 (serve
 #                    image-source policy and pricing this setup does not use), 70 126 184 (draft
 #                    PRs; 126 only moves the elastic KV this config disables with --kv-resident),
@@ -192,8 +195,10 @@ build() {
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_C_COMPILER=/usr/bin/gcc \
     -DCMAKE_CXX_COMPILER=/usr/bin/g++ \
+    -DCMAKE_CXX_FLAGS="$_cxx_flags" \
     -DCMAKE_CUDA_COMPILER=/opt/cuda/bin/nvcc \
     -DCMAKE_CUDA_ARCHITECTURES="$_cuda_archs" \
+    -DCMAKE_CUDA_FLAGS="$_cuda_flags" \
     -DBUILD_TESTING=OFF
   cmake --build build --target "${_targets[@]}" -j "$_jobs"
 }
